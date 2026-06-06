@@ -7,7 +7,10 @@ import SkillCreate from './components/SkillCreate'
 import SkillDetail from './components/SkillDetail'
 import SkillLibrary from './components/SkillLibrary'
 import SkillGroupDetail from './components/SkillGroupDetail'
+import AgentsPage from './components/AgentsPage'
+import AgentDetailPage from './components/AgentDetailPage'
 import { findSkill } from './data/skills'
+import { findAgent } from './data/agents'
 import { GROUPS } from './components/SkillsPage'
 import AIPanel from './components/AIPanel'
 import StatusBar from './components/StatusBar'
@@ -26,6 +29,7 @@ function readParams() {
     ai: p.get('ai') === '1',
     nav: p.get('nav') || 'agents',
     tab: p.get('tab') === 'groups' ? 'Skill Groups' : 'Skills',
+    agentId: p.get('agent') || null,
   }
 }
 
@@ -39,6 +43,7 @@ export default function App() {
   const [skillsTab, setSkillsTab] = useState(init.tab)
   const [selectedSkill, setSelectedSkill] = useState(() => init.skillId ? findSkill(init.skillId) || null : null)
   const [selectedGroup, setSelectedGroup] = useState(() => init.groupId ? GROUPS.find(g => g.id === init.groupId) || null : null)
+  const [selectedAgent, setSelectedAgent] = useState(() => init.agentId ? findAgent(init.agentId) || null : null)
   const [importedSkill, setImportedSkill] = useState(null)
   const [aiBuild, setAiBuild] = useState(false)
   const [aiSide, setAiSide] = useState('right') // 'right' | 'left'
@@ -105,12 +110,13 @@ export default function App() {
     if (view === 'detail' && selectedGraph) p.set('graph', selectedGraph.id)
     if (view === 'skill-detail' && selectedSkill) p.set('skill', selectedSkill.id)
     if (view === 'skill-group-detail' && selectedGroup) p.set('grp', selectedGroup.id)
+    if (view === 'agent-detail' && selectedAgent) p.set('agent', selectedAgent.id)
     if (aiOpen) p.set('ai', '1')
     if (activeNav && activeNav !== 'agents') p.set('nav', activeNav)
     if (view === 'skills' && skillsTab === 'Skill Groups') p.set('tab', 'groups')
     const qs = p.toString()
     window.history.replaceState(null, '', qs ? `${window.location.pathname}?${qs}` : window.location.pathname)
-  }, [view, selectedGraph, selectedSkill, selectedGroup, aiOpen, activeNav, skillsTab])
+  }, [view, selectedGraph, selectedSkill, selectedGroup, selectedAgent, aiOpen, activeNav, skillsTab])
 
   // sync state <- URL on back/forward
   useEffect(() => {
@@ -120,6 +126,7 @@ export default function App() {
       setSelectedGraph(s.graphId ? GRAPHS.find(g => g.id === s.graphId) || null : null)
       setSelectedSkill(s.skillId ? findSkill(s.skillId) || null : null)
       setSelectedGroup(s.groupId ? GROUPS.find(g => g.id === s.groupId) || null : null)
+      setSelectedAgent(s.agentId ? findAgent(s.agentId) || null : null)
       setAiOpen(s.ai)
       setActiveNav(s.nav)
       setSkillsTab(s.tab)
@@ -129,6 +136,7 @@ export default function App() {
   }, [])
 
   const handleNavigate = (label) => {
+    if (label === 'Agents') { setView('agents'); setActiveNav('agents'); setSelectedAgent(null) }
     if (label === 'Skills') { setView('skills'); setActiveNav('agents'); setSkillsTab('Skills') }
   }
 
@@ -139,7 +147,7 @@ export default function App() {
       overflow: 'hidden', background: 'var(--green-frame)',
     }}>
       <Sidebar onNavigate={handleNavigate} activeId={activeNav} onSelectNav={setActiveNav}
-        activeChild={view === 'skills' ? 'Skills' : null}
+        activeChild={view === 'agents' || view === 'agent-detail' ? 'Agents' : view === 'skills' ? 'Skills' : null}
         showFde={leftSession} fdeActive={aiOpen && aiSide === 'left'}
         onToggleFde={() => setAiOpen(o => !o)} />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
@@ -161,6 +169,12 @@ export default function App() {
           )}
           {view === 'detail' && (
             <GraphDetailPage graph={selectedGraph} onBack={() => setView('graphs')} />
+          )}
+          {view === 'agents' && (
+            <AgentsPage onOpenAgent={a => { setSelectedAgent(a); setView('agent-detail') }} />
+          )}
+          {view === 'agent-detail' && selectedAgent && (
+            <AgentDetailPage agent={selectedAgent} onBack={() => { setView('agents'); setActiveNav('agents') }} />
           )}
           {view === 'skills' && <SkillsPage tab={skillsTab} onTabChange={setSkillsTab} onCreate={() => setScratchOpen(true)} onBuildAI={() => setBuildPrompt('right')} onReveal={() => setBuildPrompt('left')} onLibrary={() => setView('skill-library')} onImportZip={d => openEditor(d)} onOpenSkill={s => { setSelectedSkill(s); setView('skill-detail') }} onOpenGroup={g => { setSelectedGroup(g); setView('skill-group-detail') }} />}
           {view === 'skill-create' && <SkillCreate imported={importedSkill} onBack={() => { setView('skills'); setActiveNav('agents') }} />}
