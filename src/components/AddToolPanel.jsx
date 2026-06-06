@@ -2597,17 +2597,70 @@ function goBackStep(step) {
   return 'app'
 }
 
-export default function AddToolPanel({ onClose, onAdd, appsOnly = false }) {
-  const [tab, setTab] = useState(appsOnly ? 'apps' : 'tools')      // tools | apps
-  const [step, setStep] = useState('app')      // app | action | connection | summary | inputs | settings | context
+function resolveAgentTool(tool) {
+  if (!tool?.app || tool.app.slug === '__builtin') return null
+
+  const app = APPS.find(a => a.id === tool.app.slug || a.slug === tool.app.slug)
+  if (!app) return null
+
+  const actions = ACTIONS[app.id] || GENERIC_ACTIONS
+  let actionLabel = tool.name
+  const viaMatch = tool.name.match(/^(.+?)\s+via\s+/i)
+  if (viaMatch) actionLabel = viaMatch[1]
+
+  const action = actions.find(a =>
+    a.name.toLowerCase() === actionLabel.toLowerCase()
+    || tool.name.toLowerCase().startsWith(a.name.toLowerCase())
+    || (tool.desc && a.desc === tool.desc),
+  )
+  if (!action) return null
+
+  return { app, action }
+}
+
+function getInitialEditState(tool, initialStep) {
+  const resolved = resolveAgentTool(tool)
+  if (!resolved) return null
+
+  const { app, action } = resolved
+  const useRuntimeConnection = Boolean(tool.endUserConnection)
+  const connectionId = useRuntimeConnection ? null : getDefaultConnectionId(app.id)
+
+  return {
+    tab: 'apps',
+    step: initialStep,
+    app,
+    action,
+    connectionId,
+    useRuntimeConnection,
+    requireApproval: tool.approval === 'Required',
+    toolName: tool.name || '',
+    toolDescription: tool.desc || '',
+    inputValues: getDefaultInputValues(getFieldsForAction(app.id, action.id)),
+  }
+}
+
+export default function AddToolPanel({
+  onClose,
+  onAdd,
+  onSave,
+  tool: editTool,
+  initialStep = 'inputs',
+  appsOnly = false,
+}) {
+  const editState = editTool ? getInitialEditState(editTool, initialStep) : null
+  const isEdit = Boolean(editState)
+
+  const [tab, setTab] = useState(editState?.tab ?? (appsOnly ? 'apps' : 'tools'))      // tools | apps
+  const [step, setStep] = useState(editState?.step ?? 'app')      // app | action | connection | summary | inputs | settings | context
   const [returnTo, setReturnTo] = useState(null)
-  const [app, setApp] = useState(null)
-  const [action, setAction] = useState(null)
+  const [app, setApp] = useState(editState?.app ?? null)
+  const [action, setAction] = useState(editState?.action ?? null)
   const [q, setQ] = useState('')
   const [picked, setPicked] = useState(() => new Set())
-  const [connectionId, setConnectionId] = useState(null)
-  const [useRuntimeConnection, setUseRuntimeConnection] = useState(false)
-  const [requireApproval, setRequireApproval] = useState(false)
+  const [connectionId, setConnectionId] = useState(editState?.connectionId ?? null)
+  const [useRuntimeConnection, setUseRuntimeConnection] = useState(editState?.useRuntimeConnection ?? false)
+  const [requireApproval, setRequireApproval] = useState(editState?.requireApproval ?? false)
   const [reuseResponses, setReuseResponses] = useState(false)
   const [rateLimitEnabled, setRateLimitEnabled] = useState(false)
   const [rateLimitConfig, setRateLimitConfig] = useState(DEFAULT_RATE_LIMIT_CONFIG)
@@ -2615,9 +2668,9 @@ export default function AddToolPanel({ onClose, onAdd, appsOnly = false }) {
   const [invocationCostEnabled, setInvocationCostEnabled] = useState(false)
   const [invocationCost, setInvocationCost] = useState(DEFAULT_INVOCATION_COST)
   const [cacheConfig, setCacheConfig] = useState(DEFAULT_CACHE_CONFIG)
-  const [inputValues, setInputValues] = useState({})
-  const [toolName, setToolName] = useState('')
-  const [toolDescription, setToolDescription] = useState('')
+  const [inputValues, setInputValues] = useState(editState?.inputValues ?? {})
+  const [toolName, setToolName] = useState(editState?.toolName ?? '')
+  const [toolDescription, setToolDescription] = useState(editState?.toolDescription ?? '')
   const [outputFilterMode, setOutputFilterMode] = useState('all')
   const [selectedOutputFields, setSelectedOutputFields] = useState([])
   const [headerIconHover, setHeaderIconHover] = useState(false)
@@ -2729,13 +2782,13 @@ export default function AddToolPanel({ onClose, onAdd, appsOnly = false }) {
     setReturnTo(null)
     setQ('')
   }
-  const addApp = () => {
-    if (!action) return
+  const buildToolEntry = () => {
     const approval = requireApproval ? 'Required' : 'None'
     const inputs = formatInputsSummary(inputFields, inputValues)
     const name = toolName.trim() || (app?.name && action?.name ? `${app.name}: ${action.name}` : action.name || '')
     const description = toolDescription.trim() || action?.desc || ''
-    onAdd?.({
+    return {
+      id: editTool?.id,
       app, action, connection: selectedConnection, useRuntimeConnection, approval, inputs, inputValues,
       cache: reuseResponses ? cacheConfig : null,
       rateLimit: rateLimitEnabled ? rateLimitConfig : null,
@@ -2746,7 +2799,14 @@ export default function AddToolPanel({ onClose, onAdd, appsOnly = false }) {
       outputFilter: outputFilterMode === 'all'
         ? { mode: 'all' }
         : { mode: 'filter', fields: selectedOutputFields },
-    })
+    }
+  }
+
+  const finishTool = () => {
+    if (!action) return
+    const entry = buildToolEntry()
+    if (isEdit) onSave?.(entry)
+    else onAdd?.(entry)
     onClose?.()
   }
   const inAppsFlow = appsOnly || tab === 'apps'
@@ -3069,9 +3129,9 @@ export default function AddToolPanel({ onClose, onAdd, appsOnly = false }) {
               Back
             </button>
             <div style={{ flex: 1 }} />
-            <button onClick={addApp} style={{ height: 38, padding: '0 20px', background: 'var(--green-btn)', color: '#fff', border: 'none', borderRadius: 9, fontSize: 13.5, fontWeight: 500, cursor: 'pointer' }}
+            <button onClick={finishTool} style={{ height: 38, padding: '0 20px', background: 'var(--green-btn)', color: '#fff', border: 'none', borderRadius: 9, fontSize: 13.5, fontWeight: 500, cursor: 'pointer' }}
               onMouseOver={e => { e.currentTarget.style.background = '#1d4228' }} onMouseOut={e => { e.currentTarget.style.background = '#16341f' }}>
-              Add tool
+              {isEdit ? 'Save changes' : 'Add tool'}
             </button>
           </div>
         )}
@@ -3084,9 +3144,9 @@ export default function AddToolPanel({ onClose, onAdd, appsOnly = false }) {
               Back
             </button>
             <div style={{ flex: 1 }} />
-            <button onClick={addApp} style={{ height: 38, padding: '0 20px', background: 'var(--green-btn)', color: '#fff', border: 'none', borderRadius: 9, fontSize: 13.5, fontWeight: 500, cursor: 'pointer' }}
+            <button onClick={finishTool} style={{ height: 38, padding: '0 20px', background: 'var(--green-btn)', color: '#fff', border: 'none', borderRadius: 9, fontSize: 13.5, fontWeight: 500, cursor: 'pointer' }}
               onMouseOver={e => e.currentTarget.style.background = '#1d4228'} onMouseOut={e => e.currentTarget.style.background = '#16341f'}>
-              Add tool
+              {isEdit ? 'Save changes' : 'Add tool'}
             </button>
           </div>
         )}
@@ -3099,9 +3159,9 @@ export default function AddToolPanel({ onClose, onAdd, appsOnly = false }) {
               Back
             </button>
             <div style={{ flex: 1 }} />
-            <button onClick={addApp} style={{ height: 38, padding: '0 20px', background: 'var(--green-btn)', color: '#fff', border: 'none', borderRadius: 9, fontSize: 13.5, fontWeight: 500, cursor: 'pointer' }}
+            <button onClick={finishTool} style={{ height: 38, padding: '0 20px', background: 'var(--green-btn)', color: '#fff', border: 'none', borderRadius: 9, fontSize: 13.5, fontWeight: 500, cursor: 'pointer' }}
               onMouseOver={e => e.currentTarget.style.background = '#1d4228'} onMouseOut={e => e.currentTarget.style.background = '#16341f'}>
-              Add tool
+              {isEdit ? 'Save changes' : 'Add tool'}
             </button>
           </div>
         )}

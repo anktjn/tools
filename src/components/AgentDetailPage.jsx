@@ -31,7 +31,7 @@ const STANDARD_TOOLS = [
 
 function Toggle({ on, onChange }) {
   return (
-    <button type="button" onClick={() => onChange(!on)} aria-pressed={on} style={{
+    <button type="button" onClick={e => { e.stopPropagation(); onChange(!on) }} aria-pressed={on} style={{
       width: 36, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer', padding: 2,
       background: on ? 'var(--green-btn)' : '#e3ddd1', transition: 'background .15s',
       display: 'flex', alignItems: 'center', flexShrink: 0,
@@ -62,13 +62,13 @@ function toolFromPanelEntry(entry) {
   const actionName = entry.action?.name || 'Tool'
   const slug = entry.app?.slug || 'unknown'
   const isBuiltin = entry.builtin || slug === '__builtin'
-  const name = isBuiltin ? actionName : `${actionName} via ${appName}`
+  const name = entry.name || (isBuiltin ? actionName : `${actionName} via ${appName}`)
   return {
-    id: `tool-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    id: entry.id || `tool-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     name,
-    desc: entry.action?.desc || '',
+    desc: entry.description || entry.action?.desc || '',
     app: { name: isBuiltin ? 'built-in' : (slug === 'slack' ? 'slack' : appName.toLowerCase()), slug },
-    inputs: '',
+    inputs: entry.inputs || '',
     approval: entry.approval || 'None',
     connector: isBuiltin ? 'built-in' : (slug === 'slack' ? 'slack' : slug),
     endUserConnection: !isBuiltin && !!entry.useRuntimeConnection,
@@ -81,7 +81,7 @@ export default function AgentDetailPage({ agent, onBack }) {
   const [configSection, setConfigSection] = useState('tools')
   const [tools, setTools] = useState(() => [...(agent.tools || [])])
   const [standardTools, setStandardTools] = useState(() => [...STANDARD_TOOLS])
-  const [toolPanel, setToolPanel] = useState(false)
+  const [toolPanel, setToolPanel] = useState(null)
   const [search, setSearch] = useState('')
 
   const filteredTools = useMemo(() =>
@@ -89,6 +89,7 @@ export default function AgentDetailPage({ agent, onBack }) {
     [tools, search])
 
   const addTool = (entry) => setTools(ts => [...ts, toolFromPanelEntry(entry)])
+  const saveTool = (entry) => setTools(ts => ts.map(t => t.id === entry.id ? toolFromPanelEntry({ ...entry, enabled: t.enabled }) : t))
   const toggleTool = (id, enabled) => setTools(ts => ts.map(t => t.id === id ? { ...t, enabled } : t))
   const toggleStandard = (id, enabled) => setStandardTools(ts => ts.map(t => t.id === id ? { ...t, enabled } : t))
 
@@ -195,7 +196,8 @@ export default function AgentDetailPage({ agent, onBack }) {
                   setSearch={setSearch}
                   onToggle={toggleTool}
                   onToggleStandard={toggleStandard}
-                  onAddTool={() => setToolPanel(true)}
+                  onAddTool={() => setToolPanel('add')}
+                  onEditTool={tool => setToolPanel(tool)}
                 />
               ) : (
                 <PlaceholderSection section={CONFIG_NAV.find(n => n.id === configSection)?.label || configSection} />
@@ -209,7 +211,16 @@ export default function AgentDetailPage({ agent, onBack }) {
         )}
       </div>
 
-      {toolPanel && <AddToolPanel onClose={() => setToolPanel(false)} onAdd={addTool} />}
+      {toolPanel && (
+        <AddToolPanel
+          key={toolPanel === 'add' ? 'add' : toolPanel.id}
+          onClose={() => setToolPanel(null)}
+          onAdd={toolPanel === 'add' ? addTool : undefined}
+          onSave={toolPanel !== 'add' ? saveTool : undefined}
+          tool={toolPanel !== 'add' ? toolPanel : undefined}
+          initialStep="inputs"
+        />
+      )}
     </div>
   )
 }
@@ -225,7 +236,7 @@ const COMBINED_COL_PAD = [
   {},
 ]
 
-function ToolsSection({ tools, standardTools, search, setSearch, onToggle, onToggleStandard, onAddTool }) {
+function ToolsSection({ tools, standardTools, search, setSearch, onToggle, onToggleStandard, onAddTool, onEditTool }) {
   const q = search.trim().toLowerCase()
   const filteredStandard = q
     ? standardTools.filter(t => (t.name + ' ' + t.desc).toLowerCase().includes(q))
@@ -285,14 +296,14 @@ function ToolsSection({ tools, standardTools, search, setSearch, onToggle, onTog
           {tools.map((t, i) => {
             const last = i === tools.length - 1 && filteredStandard.length === 0
             return (
-              <TableRow key={t.id} cols={COMBINED_COLS} last={last}>
+              <TableRow key={t.id} cols={COMBINED_COLS} last={last} onClick={() => onEditTool(t)}>
                 <Cell pad={COMBINED_COL_PAD[0]}><Toggle on={t.enabled} onChange={v => onToggle(t.id, v)} /></Cell>
                 <Cell pad={COMBINED_COL_PAD[1]}><ToolNameCell glyph={<ToolIcon app={t.app} />} name={t.name} /></Cell>
                 <Cell pad={COMBINED_COL_PAD[2]}><DescriptionText text={t.desc} /></Cell>
                 <Cell pad={COMBINED_COL_PAD[3]}><ConnectionBadge endUser={t.endUserConnection} /></Cell>
                 <Cell pad={COMBINED_COL_PAD[4]}><ApprovalBadge value={t.approval} /></Cell>
                 <ActionCell>
-                  <RowActionsBtn />
+                  <RowActionsBtn onClick={e => e.stopPropagation()} />
                 </ActionCell>
               </TableRow>
             )
@@ -469,11 +480,14 @@ function TableHead({ cols, labels, colPad = [] }) {
   )
 }
 
-function TableRow({ cols, last, children }) {
+function TableRow({ cols, last, children, onClick }) {
   return (
-    <div style={{
+    <div
+      onClick={onClick}
+      style={{
       display: 'grid', gridTemplateColumns: cols, alignItems: 'center', minHeight: 44,
       borderBottom: last ? 'none' : '1px solid #f3f0ea', transition: 'background .12s',
+      cursor: onClick ? 'pointer' : undefined,
     }}
       onMouseOver={e => e.currentTarget.style.background = '#faf9f7'}
       onMouseOut={e => e.currentTarget.style.background = 'transparent'}>
@@ -508,7 +522,7 @@ function RowActionsBtn({ title = 'Row actions', onClick }) {
       type="button"
       title={title}
       aria-label={title}
-      onClick={onClick}
+      onClick={e => { e.stopPropagation(); onClick?.(e) }}
       style={{
         width: 28, height: 28, flexShrink: 0,
         border: 'none', background: 'transparent', borderRadius: 7, outline: 'none',
