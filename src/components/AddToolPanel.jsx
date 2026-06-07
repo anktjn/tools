@@ -43,6 +43,51 @@ const sectionLabelStyle = {
 const tablerToolProps = { stroke: 1.75, strokeLinecap: 'round', strokeLinejoin: 'round' }
 const TOOL_ICON_COLOR = '#8a7648'
 
+function SoftIconButton({ ariaLabel, onClick, children, style }) {
+  const [hovered, setHovered] = useState(false)
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={ariaLabel}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        width: 30, height: 30, border: 'none', cursor: 'pointer', padding: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: '#9a917f', borderRadius: 8, flexShrink: 0,
+        background: hovered ? '#f7f4ec' : 'transparent',
+        transition: 'background .12s',
+        ...style,
+      }}
+    >
+      {children}
+    </button>
+  )
+}
+
+function SoftTextButton({ onClick, children, style }) {
+  const [hovered, setHovered] = useState(false)
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        height: 38, padding: '0 12px', border: 'none', borderRadius: 9, cursor: 'pointer',
+        display: 'flex', alignItems: 'center', gap: 4,
+        background: hovered ? '#f7f4ec' : 'transparent',
+        color: '#3a3a36', fontSize: 13.5, fontWeight: 500,
+        transition: 'background .12s',
+        ...style,
+      }}
+    >
+      {children}
+    </button>
+  )
+}
+
 /* ── real brand logos via Simple Icons CDN, with graceful fallbacks ── */
 function ToolGlyph({ slug, name, size = 22, icon = null }) {
   const [err, setErr] = useState(false)
@@ -300,76 +345,56 @@ function ConnectionInfo({ conn }) {
   )
 }
 
-function ConnectionListRow({ conn, selected, isLast, onSelect }) {
+function ConnectionListRow({
+  conn, selected, isLast, onSelect,
+  useRuntimeConnection, onUseRuntimeConnectionChange,
+}) {
   const isDisconnected = conn.status === 'disconnected'
+  const showRuntimeOption = selected && !isDisconnected
 
   return (
     <div
-      onClick={isDisconnected ? undefined : () => onSelect(conn.id)}
       onMouseOver={e => { if (!isDisconnected && !selected) e.currentTarget.style.background = '#faf7f0' }}
       onMouseOut={e => { e.currentTarget.style.background = selected ? '#f4f9f5' : '#fff' }}
       style={{
-        display: 'flex', alignItems: 'center', gap: 12, padding: '12px 12px',
-        cursor: isDisconnected ? 'default' : 'pointer',
+        padding: '12px 12px',
         background: selected ? '#f4f9f5' : '#fff',
         borderBottom: !isLast ? '1px solid #f4eee2' : 'none', transition: 'background .12s',
       }}
     >
-      <ConnectionInfo conn={conn} />
+      <div
+        onClick={isDisconnected ? undefined : () => onSelect(conn.id)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          cursor: isDisconnected ? 'default' : 'pointer',
+        }}
+      >
+        <ConnectionInfo conn={conn} />
 
-      {isDisconnected ? (
-        <button
-          type="button"
-          onClick={e => e.stopPropagation()}
-          onMouseOver={e => { e.currentTarget.style.color = '#1d4228' }}
-          onMouseOut={e => { e.currentTarget.style.color = 'var(--green-btn)' }}
-          style={{
-            height: 30, padding: '0 4px', flexShrink: 0,
-            background: 'none', color: 'var(--green-btn)',
-            border: 'none', fontSize: 12.5, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap',
-            transition: 'color .15s',
-          }}
-        >
-          Connect
-        </button>
-      ) : (
-        <ConnectionRadio checked={selected} />
-      )}
-    </div>
-  )
-}
-
-function ConnectionCategoryList({
-  connected, disconnected, connectionId, onSelectConnection,
-  selectedConnection, useRuntimeConnection, onUseRuntimeConnectionChange,
-}) {
-  const listStyle = {
-    border: '1px solid #eee7da', borderRadius: 14, overflow: 'hidden',
-    background: '#fff', boxShadow: '0 1px 2px rgba(60,50,30,0.03)',
-  }
-
-  const items = [...connected, ...disconnected]
-
-  const listItems = selectedConnection && !useRuntimeConnection
-    ? items.filter(c => c.id !== selectedConnection.id)
-    : items
-
-  return (
-    <div style={listStyle}>
-      <div style={{
-        borderBottom: listItems.length ? '1px solid #f4eee2' : 'none',
-        background: selectedConnection && !useRuntimeConnection ? '#f4f9f5' : '#fff',
-      }}>
-        {selectedConnection && !useRuntimeConnection && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 12px 0' }}>
-            <ConnectionInfo conn={selectedConnection} />
-            <ConnectionRadio checked />
-          </div>
+        {isDisconnected ? (
+          <button
+            type="button"
+            onClick={e => e.stopPropagation()}
+            onMouseOver={e => { e.currentTarget.style.color = '#1d4228' }}
+            onMouseOut={e => { e.currentTarget.style.color = 'var(--green-btn)' }}
+            style={{
+              height: 30, padding: '0 4px', flexShrink: 0,
+              background: 'none', color: 'var(--green-btn)',
+              border: 'none', fontSize: 12.5, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap',
+              transition: 'color .15s',
+            }}
+          >
+            Connect
+          </button>
+        ) : (
+          <ConnectionRadio checked={selected} />
         )}
+      </div>
+
+      {showRuntimeOption && (
         <label style={{
-          display: 'flex', alignItems: 'center', gap: 10,
-          padding: selectedConnection && !useRuntimeConnection ? '8px 12px 12px' : '12px 12px',
-          cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer',
+          marginTop: 12, paddingTop: 12, borderTop: '1px solid #e6efe8',
         }}>
           <input
             type="checkbox"
@@ -382,15 +407,33 @@ function ConnectionCategoryList({
             Use end user&apos;s connection at runtime for this tool
           </span>
         </label>
-      </div>
+      )}
+    </div>
+  )
+}
 
-      {listItems.length > 0 ? listItems.map((conn, i) => (
+function ConnectionCategoryList({
+  connected, disconnected, connectionId, onSelectConnection,
+  useRuntimeConnection, onUseRuntimeConnectionChange,
+}) {
+  const listStyle = {
+    border: '1px solid #eee7da', borderRadius: 14, overflow: 'hidden',
+    background: '#fff', boxShadow: '0 1px 2px rgba(60,50,30,0.03)',
+  }
+
+  const items = [...connected, ...disconnected]
+
+  return (
+    <div style={listStyle}>
+      {items.length > 0 ? items.map((conn, i) => (
         <ConnectionListRow
           key={conn.id}
           conn={conn}
           selected={connectionId === conn.id}
-          isLast={i === listItems.length - 1}
+          isLast={i === items.length - 1}
           onSelect={onSelectConnection}
+          useRuntimeConnection={useRuntimeConnection}
+          onUseRuntimeConnectionChange={onUseRuntimeConnectionChange}
         />
       )) : (
         <div style={{ padding: '28px 20px', textAlign: 'center', fontSize: 13, color: '#9a917f', lineHeight: 1.45 }}>
@@ -406,10 +449,6 @@ function ToolSetupSummary({
   useRuntimeConnection, onUseRuntimeConnectionChange,
 }) {
   const allConnections = useMemo(() => getConnectionsForApp(app.id), [app.id])
-  const selectedConnection = useMemo(
-    () => (connectionId ? allConnections.find(c => c.id === connectionId) : null),
-    [allConnections, connectionId],
-  )
 
   const { connected, disconnected } = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -433,13 +472,11 @@ function ToolSetupSummary({
   }, [allConnections, query, connectionId])
 
   const handleSelectConnection = (id) => {
-    onUseRuntimeConnectionChange(false)
     onSelectConnection(id)
   }
 
   const handleRuntimeConnectionChange = (checked) => {
     onUseRuntimeConnectionChange(checked)
-    if (checked) onSelectConnection(null)
   }
 
   return (
@@ -489,7 +526,6 @@ function ToolSetupSummary({
         disconnected={disconnected}
         connectionId={connectionId}
         onSelectConnection={handleSelectConnection}
-        selectedConnection={selectedConnection}
         useRuntimeConnection={useRuntimeConnection}
         onUseRuntimeConnectionChange={handleRuntimeConnectionChange}
       />
@@ -2247,10 +2283,13 @@ function OutputRow({
     </span>
   )
 
+  const isToggleable = customizing && onToggle
+
   const rowStyle = {
     display: 'flex', alignItems: 'stretch', gap: 0, minHeight: 30,
     borderRadius: 8, padding: '0 8px', margin: '0 -8px',
     background: hovered ? '#f7f4ec' : 'transparent', transition: 'background .12s',
+    cursor: isToggleable ? 'pointer' : undefined,
   }
 
   return (
@@ -2258,17 +2297,12 @@ function OutputRow({
       style={rowStyle}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onClick={isToggleable ? onToggle : undefined}
     >
       {customizing && (
         <span style={{ display: 'flex', alignItems: 'center', flexShrink: 0, marginRight: 10 }}>
           {onToggle ? (
-            <button
-              type="button"
-              onClick={e => { e.stopPropagation(); onToggle() }}
-              style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', display: 'flex' }}
-            >
-              <ConnectionCheckbox checked={checked} indeterminate={indeterminate} />
-            </button>
+            <ConnectionCheckbox checked={checked} indeterminate={indeterminate} />
           ) : (
             <span style={{ width: 16, height: 16 }} aria-hidden />
           )}
@@ -2291,7 +2325,7 @@ function OutputRow({
       {expandable ? (
         <button
           type="button"
-          onClick={onClick}
+          onClick={e => { e.stopPropagation(); onClick() }}
           aria-label={expanded ? 'Collapse' : 'Expand'}
           style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', minWidth: 0, flex: 1, display: 'flex', alignItems: 'center' }}
         >
@@ -2524,13 +2558,32 @@ function OutputFilterSection({ onModeChange, fields, selectedIds, onSelectedChan
   )
 }
 
+const TOOL_WHEN_EXAMPLES = {
+  edit: app => `fixing typos, updating announcements, or revising messages in ${app}`,
+  post: app => `posting updates, sharing alerts, or replying in a ${app} channel`,
+  send: app => `sharing files, posting updates, or notifying a channel in ${app}`,
+  delete: app => `removing outdated or incorrect content in ${app}`,
+  get: app => `looking up details or fetching info the user asked for from ${app}`,
+  list: app => `browsing channels, users, history, or other ${app} data`,
+  add: app => `adding a reaction, invite, or other update in ${app}`,
+  remove: app => `undoing a reaction or clearing something in ${app}`,
+  create: app => `the user asks to create something new in ${app}`,
+  download: app => `the user needs a file or attachment from ${app}`,
+  archive: app => `archiving inactive conversations in ${app}`,
+  open: app => `opening a view, DM, or conversation in ${app}`,
+  set: app => `updating settings like topic or purpose in ${app}`,
+  respond: app => `handling an interactive button or user action in ${app}`,
+}
+
 function toolDescriptionPlaceholder(app, action) {
   const appName = app?.name || 'the app'
   const actionName = action?.name || 'run this action'
   const actionLower = actionName.toLowerCase()
-  const example = action?.desc || `${actionName} using ${appName}.`
+  const verb = actionLower.split(' ')[0]
+  const whenExample = TOOL_WHEN_EXAMPLES[verb]?.(appName)
+    ?? `the user asks to ${actionLower} in ${appName}`
 
-  return `Describe what this tool does and when to use it. E.g. ${example}`
+  return `What it does and when to use it. E.g. Use when ${whenExample}.`
 }
 
 function AgentContextForm({
@@ -2951,13 +3004,9 @@ export default function AddToolPanel({
                 <IconPlayerPlay size={18} stroke={1.75} />
               </button>
             )}
-            <button onClick={onClose} aria-label="Close" style={{
-              border: 'none', background: 'none', cursor: 'pointer', padding: 0,
-              width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#9a917f',
-            }}>
+            <SoftIconButton ariaLabel="Close" onClick={onClose}>
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M4.5 4.5l9 9M13.5 4.5l-9 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
-            </button>
+            </SoftIconButton>
           </div>
         </div>
 
@@ -3097,10 +3146,10 @@ export default function AddToolPanel({
         {/* Footer — setup summary / select connection */}
         {inAppsFlow && step === 'summary' && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 20px', borderTop: '1px solid #f2ede3', flexShrink: 0 }}>
-            <button onClick={() => { setStep('action'); setQ('') }} style={{ height: 38, padding: '0 12px', background: 'none', color: '#3a3a36', border: 'none', fontSize: 13.5, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <SoftTextButton onClick={() => { setStep('action'); setQ('') }}>
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M9.5 3.5L5 8l4.5 4.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
               Back
-            </button>
+            </SoftTextButton>
             <div style={{ flex: 1 }} />
             {(() => {
               const canProceed = Boolean(connectionId || useRuntimeConnection)
@@ -3124,10 +3173,10 @@ export default function AddToolPanel({
         {/* Footer — inputs step */}
         {inAppsFlow && step === 'inputs' && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 20px', borderTop: '1px solid #f2ede3', flexShrink: 0 }}>
-            <button onClick={() => setStep('summary')} style={{ height: 38, padding: '0 12px', background: 'none', color: '#3a3a36', border: 'none', fontSize: 13.5, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <SoftTextButton onClick={() => setStep('summary')}>
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M9.5 3.5L5 8l4.5 4.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
               Back
-            </button>
+            </SoftTextButton>
             <div style={{ flex: 1 }} />
             <button onClick={finishTool} style={{ height: 38, padding: '0 20px', background: 'var(--green-btn)', color: '#fff', border: 'none', borderRadius: 9, fontSize: 13.5, fontWeight: 500, cursor: 'pointer' }}
               onMouseOver={e => { e.currentTarget.style.background = '#1d4228' }} onMouseOut={e => { e.currentTarget.style.background = '#16341f' }}>
@@ -3139,10 +3188,10 @@ export default function AddToolPanel({
         {/* Footer — settings step */}
         {inAppsFlow && step === 'settings' && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 20px', borderTop: '1px solid #f2ede3', flexShrink: 0 }}>
-            <button onClick={goBackInFlow} style={{ height: 38, padding: '0 12px', background: 'none', color: '#3a3a36', border: 'none', fontSize: 13.5, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <SoftTextButton onClick={goBackInFlow}>
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M9.5 3.5L5 8l4.5 4.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
               Back
-            </button>
+            </SoftTextButton>
             <div style={{ flex: 1 }} />
             <button onClick={finishTool} style={{ height: 38, padding: '0 20px', background: 'var(--green-btn)', color: '#fff', border: 'none', borderRadius: 9, fontSize: 13.5, fontWeight: 500, cursor: 'pointer' }}
               onMouseOver={e => e.currentTarget.style.background = '#1d4228'} onMouseOut={e => e.currentTarget.style.background = '#16341f'}>
@@ -3154,10 +3203,10 @@ export default function AddToolPanel({
         {/* Footer — agent context step */}
         {inAppsFlow && step === 'context' && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 20px', borderTop: '1px solid #f2ede3', flexShrink: 0 }}>
-            <button onClick={goBackInFlow} style={{ height: 38, padding: '0 12px', background: 'none', color: '#3a3a36', border: 'none', fontSize: 13.5, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <SoftTextButton onClick={goBackInFlow}>
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M9.5 3.5L5 8l4.5 4.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
               Back
-            </button>
+            </SoftTextButton>
             <div style={{ flex: 1 }} />
             <button onClick={finishTool} style={{ height: 38, padding: '0 20px', background: 'var(--green-btn)', color: '#fff', border: 'none', borderRadius: 9, fontSize: 13.5, fontWeight: 500, cursor: 'pointer' }}
               onMouseOver={e => e.currentTarget.style.background = '#1d4228'} onMouseOut={e => e.currentTarget.style.background = '#16341f'}>
